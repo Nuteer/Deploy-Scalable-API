@@ -1,0 +1,7 @@
+api:
+  replicas: 5
+ingress-controller:
+  replicas: 2
+database:
+  replicas: 2
+  storage: 20Gi

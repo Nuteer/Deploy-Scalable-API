@@ -1,0 +1,61 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.0.0
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+        continue-on-error: true
+
+      - name: Setup Helm
+        if: success()
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      - name: Deploy API
+        if: success()
+        run: helm upgrade --install api ./helm/charts/api --values ./helm/values/dev-values.yaml
+
+      - name: Deploy Ingress Controller
+        if: success()
+        run: helm upgrade --install ingress-controller ./helm/charts/ingress-controller --values ./helm/values/dev-values.yaml
+
+      - name: Deploy Database
+        if: success()
+        run: helm upgrade --install database ./helm/charts/database --values ./helm/values/dev-values.yaml
+
+  rollback:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: failure()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.0.0
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Rollback
+        run: terraform destroy -auto-approve
